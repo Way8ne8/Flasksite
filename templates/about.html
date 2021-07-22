@@ -3,4 +3,7 @@
 {% block content %}
 {{ super() }}
 Содержимое страницы "о сайте"
+{% for t in amenu %}
+<li>{{t}}</li>
+{% endfor %}
 {% endblock %}
