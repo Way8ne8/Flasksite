@@ -4,9 +4,9 @@ app = Flask(__name__)
 app.config['SECRET_KEY'] = 'fdgsafafasfda5415afd5a'
 
 menu = [{"name": "Главная", "url": "/"},
-        {"name": "Login", "url": "login"},
-        {"name": "Первое приложение", "url": "first-app"},
-        {"name": "Обратная связь", "url": "contact"}]
+        {"name": "Login", "url": "/login"},
+        {"name": "Первое приложение", "url": "/first-app"},
+        {"name": "Обратная связь", "url": "/contact"}]
 fmenu = ["О компании", "Контакты", "ББ"]
 
 @app.route("/")
@@ -21,7 +21,7 @@ def login():
     elif request.method == 'POST' and request.form['username'] == "123" and request.form['psw'] == "123":
         session['userLogged'] = request.form['username']
         return redirect(url_for('profile', username=session['userLogged']))
-    else:
+    elif request.method == 'POST' and request.form['username'] != "123" and request.form['psw'] != "123":
         flash('Ошибка авторизации', category='error')
     return render_template('login.html', title="Авторизация", menu=menu)
 
@@ -40,8 +40,9 @@ def about():
 
 @app.route("/profile/<username>")
 def profile(username):
-    # if 'userLogged' not in session or session['userLogged'] != username:
-    #     abort(401)
+    if 'userLogged' not in session or session['userLogged'] != username:
+        abort(401)
+    print(render_template('user.html', username=username, menu=menu, fmenu=fmenu))
     return render_template('user.html', username=username, menu=menu, fmenu=fmenu)
 
 @app.errorhandler(404)
