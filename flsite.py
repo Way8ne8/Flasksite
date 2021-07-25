@@ -1,6 +1,9 @@
 import sqlite3, os
-from flask import Flask, render_template, url_for, request, flash, session, redirect, abort, g
+from flask import Flask, render_template, url_for, request, flash, session, redirect, abort, g, sessions
+from werkzeug.security import generate_password_hash, check_password_hash
 from FDataBase import FDataBase
+from flask_login import LoginManager, login_user, login_required
+from UserLogin import UserLogin
 
 DATABASE = '/tmp/flsite.db'
 DEBUG = True
@@ -11,8 +14,13 @@ PASSWORD = '123'
 app = Flask(__name__)
 app.config.from_object(__name__)
 app.config.update(dict(DATABASE=os.path.join(app.root_path,'flsite.db')))
-
+login_manager = LoginManager(app)
 fmenu = ["О компании", "Контакты", "ББ"]
+@login_manager.user_loader
+def load_user(user_id):
+    print('load_user')
+    return UserLogin().fromDB(user_id, dbase)
+
 
 def connect_db():
     conn = sqlite3.connect(app.config['DATABASE'])
@@ -29,8 +37,10 @@ def create_db():
 
 @app.route("/")
 def index():
-    db = get_db()
-    dbase = FDataBase(db)
+    if 'visits' in session:
+        session['visits'] = session.get('visits') + 1  # обновление данных сессии
+    else:
+        session['visits'] = 1
     return render_template('index.html', menu=dbase.getMenu(), posts=dbase.getPostsAnonce())
 
 def get_db():
@@ -38,6 +48,14 @@ def get_db():
     if not hasattr(g, 'link_db'):
         g.link_db = connect_db()
     return g.link_db
+
+dbase = None
+@app.before_request
+def before_request():
+    """Установление соединения с БД перед выполнением запроса"""
+    global dbase
+    db = get_db()
+    dbase = FDataBase(db)
 
 @app.teardown_appcontext
 def close_db(error):
@@ -48,9 +66,6 @@ def close_db(error):
 
 @app.route("/add_post", methods=["POST", "GET"])
 def addPost():
-    db = get_db()
-    dbase = FDataBase(db)
-
     if request.method == "POST":
         if len(request.form['name']) > 4 and len(request.form['post']) > 10:
             res = dbase.addPost(request.form['name'], request.form['post'], request.form['url'])
@@ -65,8 +80,6 @@ def addPost():
 
 @app.route("/contact", methods=["POST", "GET"])
 def contact():
-    db = get_db()
-    dbase = FDataBase(db)
     if request.method == 'POST':
         if len(request.form['username']) > 2:
             res = dbase.addCont(request.form['username'], request.form['email'], request.form['message'])
@@ -76,29 +89,37 @@ def contact():
     return render_template('contact.html', menu=dbase.getMenu(), fmenu=fmenu)
 
 @app.route("/post/<alias>")
+@login_required
 def showPost(alias):
-    db = get_db()
-    dbase = FDataBase(db)
     title, post = dbase.getPost(alias)
     if not title:
         abort(404)
-
     return render_template('post.html', menu=dbase.getMenu(), title=title, post=post)
 
 @app.route("/login", methods=["POST", "GET"])
 def login():
-    if 'userLogged' in session:
-        return redirect(url_for('profile', username=session['userLogged']))
-    elif request.method == 'POST' and request.form['username'] == "123" and request.form['psw'] == "123":
-        session['userLogged'] = request.form['username']
-        return redirect(url_for('profile', username=session['userLogged']))
-    elif request.method == 'POST' and request.form['username'] != "123" and request.form['psw'] != "123":
+    if request.method == 'POST':
+        user = dbase.getUserByEmail(request.form['email'])
+        if user and check_password_hash(user['psw'], request.form['psw']):
+            userLogin = UserLogin().create(user)
+            login_user(userLogin)
+            return redirect(url_for('index'))
         flash('Ошибка авторизации', category='error')
-    return render_template('login.html', title="Авторизация", menu=menu)
+    return render_template('login.html', title="Авторизация", menu=dbase.getMenu())
 
-@app.route("/about")
-def about():
-    return render_template('about.html', menu=menu, fmenu=fmenu)
+@app.route("/register", methods=["POST", "GET"])
+def register():
+    if request.method == "POST":
+        if len(request.form['name']) > 4 and len(request.form['email']) > 4 \
+            and len(request.form['psw']) > 4 and request.form['psw'] == request.form['psw2']:
+            hash = generate_password_hash( request.form['psw'])
+            res = dbase.addUser(request.form['name'], request.form['email'], hash)
+            if res:
+                flash("Вы успешно зарегестрированы", "success")
+                return redirect(url_for('login'))
+            else:
+                flash("Ошибка при регистрации", "error")
+    return render_template('register.html', title="Авторизация", menu=dbase.getMenu())
 
 @app.route("/profile/<username>")
 def profile(username):
