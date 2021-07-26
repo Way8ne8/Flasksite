@@ -4,8 +4,6 @@ html, body {
 	padding: 0;
 	height: 100%;
 	width: 100%;
-	  color: red;
-
 }
 
 a {
@@ -51,17 +49,18 @@ div.content {
 	display: inline-block;
 	min-width: 80px;
 }
-.form-contact p {margin: 15px 0 15px 0;}
+.form-contact p {margin: 10px 0 10px 0;}
 .form-contact input[type=submit], textarea {
 	font-size: 16px;
 }
+
 .form-contact .invalid {
-         display: inline-block;
-         background: #FF9898;
+	background: #FF9898;
 }
 .form-contact .invalid-feedback {
-         color: #CC0000;
+	color: #CC0000;
 }
+
 .flash {padding: 10px;}
 .flash.success {
 	border: 1px solid #21DB56;
